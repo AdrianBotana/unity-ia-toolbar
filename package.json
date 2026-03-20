@@ -1,15 +1,16 @@
 {
-  "name": "com.adriandevs.claude-code-unity",
+  "name": "com.adriandevs.unity-ia-toolbar",
   "version": "1.0.0",
-  "displayName": "Claude Code for Unity",
-  "description": "Adds a Claude Code button to the Unity toolbar that opens a terminal with Claude CLI in your project directory.",
+  "displayName": "Unity IA Toolbar",
+  "description": "Adds an AI tool button to the Unity toolbar that opens a terminal with Claude or Copilot CLI in your project directory.",
   "unity": "2021.3",
   "author": {
     "name": "AdrianDevs"
   },
   "keywords": [
-    "claude",
     "ai",
+    "claude",
+    "copilot",
     "terminal",
     "editor",
     "toolbar"
