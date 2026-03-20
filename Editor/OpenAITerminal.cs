@@ -243,7 +243,7 @@ public static class OpenAITerminal
         string projectPath = Application.dataPath.Replace("/Assets", "");
         string command = SelectedTool == AITool.Claude
             ? "claude --dangerously-skip-permissions"
-            : "gh copilot";
+            : "copilot";
 
 #if UNITY_EDITOR_WIN
         var process = new System.Diagnostics.Process();
@@ -289,7 +289,7 @@ public class AIToolSettingsProvider : SettingsProvider
         EditorGUILayout.HelpBox(
             selected == AITool.Claude
                 ? "Claude Code will open in a terminal with --dangerously-skip-permissions flag."
-                : "GitHub Copilot CLI (gh copilot) will open in a terminal.",
+                : "GitHub Copilot CLI (copilot) will open in a terminal.",
             MessageType.Info);
     }
 

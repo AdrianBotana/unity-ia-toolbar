@@ -38,7 +38,7 @@ Go to **Edit > Preferences > AI Tool** to select which AI tool to use:
 | Tool | Command |
 |------|---------|
 | Claude | `claude --dangerously-skip-permissions` |
-| Copilot | `gh copilot` |
+| Copilot | `copilot` |
 
 The selection persists between Unity sessions.
 
