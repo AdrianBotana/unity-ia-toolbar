@@ -14,6 +14,7 @@ public enum AITool
 public static class OpenAITerminal
 {
     private const string PrefKey = "AIToolSelection";
+    private const string SkipPermsPrefKey = "AIToolSkipPermissions";
 
     private static bool initialized;
     private static int attempts;
@@ -29,6 +30,12 @@ public static class OpenAITerminal
             EditorPrefs.SetInt(PrefKey, (int)value);
             UpdateButtonAppearance();
         }
+    }
+
+    public static bool SkipPermissions
+    {
+        get => EditorPrefs.GetBool(SkipPermsPrefKey, true);
+        set => EditorPrefs.SetBool(SkipPermsPrefKey, value);
     }
 
     static OpenAITerminal()
@@ -241,9 +248,11 @@ public static class OpenAITerminal
     public static void OpenTerminal()
     {
         string projectPath = Application.dataPath.Replace("/Assets", "");
-        string command = SelectedTool == AITool.Claude
-            ? "claude --dangerously-skip-permissions"
-            : "copilot";
+        string command;
+        if (SelectedTool == AITool.Claude)
+            command = SkipPermissions ? "claude --dangerously-skip-permissions" : "claude";
+        else
+            command = SkipPermissions ? "copilot --yolo" : "copilot";
 
 #if UNITY_EDITOR_WIN
         var process = new System.Diagnostics.Process();
@@ -286,11 +295,29 @@ public class AIToolSettingsProvider : SettingsProvider
         }
 
         EditorGUILayout.Space(10);
-        EditorGUILayout.HelpBox(
-            selected == AITool.Claude
-                ? "Claude Code will open in a terminal with --dangerously-skip-permissions flag."
-                : "GitHub Copilot CLI (copilot) will open in a terminal.",
-            MessageType.Info);
+
+        var skipPerms = EditorGUILayout.Toggle("Skip Permissions", OpenAITerminal.SkipPermissions);
+        if (skipPerms != OpenAITerminal.SkipPermissions)
+        {
+            OpenAITerminal.SkipPermissions = skipPerms;
+        }
+
+        if (selected == AITool.Claude)
+        {
+            EditorGUILayout.HelpBox(
+                skipPerms
+                    ? "Claude Code will open with --dangerously-skip-permissions flag."
+                    : "Claude Code will open in normal mode (will ask for permissions).",
+                MessageType.Info);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                skipPerms
+                    ? "GitHub Copilot CLI will open with --yolo flag."
+                    : "GitHub Copilot CLI (copilot) will open in a terminal.",
+                MessageType.Info);
+        }
     }
 
     [SettingsProvider]
