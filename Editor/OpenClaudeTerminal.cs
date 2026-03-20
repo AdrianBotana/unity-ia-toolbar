@@ -4,11 +4,32 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+public enum AITool
+{
+    Claude,
+    Copilot
+}
+
 [InitializeOnLoad]
 public static class OpenClaudeTerminal
 {
+    private const string PrefKey = "AIToolSelection";
+
     private static bool initialized;
     private static int attempts;
+    private static TextElement buttonLabel;
+    private static Image buttonIcon;
+    private static ToolbarButton toolbarButton;
+
+    public static AITool SelectedTool
+    {
+        get => (AITool)EditorPrefs.GetInt(PrefKey, (int)AITool.Claude);
+        set
+        {
+            EditorPrefs.SetInt(PrefKey, (int)value);
+            UpdateButtonAppearance();
+        }
+    }
 
     static OpenClaudeTerminal()
     {
@@ -43,34 +64,43 @@ public static class OpenClaudeTerminal
         var playZone = root.Q("ToolbarZonePlayMode");
         if (playZone == null) return;
 
-        var icon = CreateClaudeIcon();
+        toolbarButton = new ToolbarButton(OpenTerminal);
+        toolbarButton.text = "";
+        toolbarButton.style.flexDirection = FlexDirection.Row;
+        toolbarButton.style.alignItems = Align.Center;
+        toolbarButton.style.paddingLeft = 6;
+        toolbarButton.style.paddingRight = 6;
 
-        var button = new ToolbarButton(OpenTerminal);
-        button.text = "";
-        button.tooltip = "Open Claude Code terminal in project directory";
-        button.style.flexDirection = FlexDirection.Row;
-        button.style.alignItems = Align.Center;
-        button.style.paddingLeft = 6;
-        button.style.paddingRight = 6;
+        buttonIcon = new Image();
+        buttonIcon.style.width = 14;
+        buttonIcon.style.height = 14;
+        buttonIcon.style.marginRight = 4;
+        toolbarButton.Add(buttonIcon);
 
-        var iconElement = new Image();
-        iconElement.image = icon;
-        iconElement.style.width = 14;
-        iconElement.style.height = 14;
-        iconElement.style.marginRight = 4;
-        button.Add(iconElement);
+        buttonLabel = new TextElement();
+        buttonLabel.style.fontSize = 11;
+        toolbarButton.Add(buttonLabel);
 
-        var label = new TextElement();
-        label.text = "Claude";
-        label.style.fontSize = 11;
-        button.Add(label);
+        UpdateButtonAppearance();
 
         var parent = playZone.parent;
         int playIndex = parent.IndexOf(playZone);
-        parent.Insert(playIndex + 1, button);
+        parent.Insert(playIndex + 1, toolbarButton);
 
         initialized = true;
         EditorApplication.update -= TryInitialize;
+    }
+
+    private static void UpdateButtonAppearance()
+    {
+        if (buttonLabel == null || buttonIcon == null || toolbarButton == null) return;
+
+        var tool = SelectedTool;
+        buttonLabel.text = tool == AITool.Claude ? "Claude" : "Copilot";
+        buttonIcon.image = tool == AITool.Claude ? CreateClaudeIcon() : CreateCopilotIcon();
+        toolbarButton.tooltip = tool == AITool.Claude
+            ? "Open Claude Code terminal in project directory"
+            : "Open GitHub Copilot chat in project directory";
     }
 
     private static Texture2D CreateClaudeIcon()
@@ -147,29 +177,128 @@ public static class OpenClaudeTerminal
         return tex;
     }
 
-    [MenuItem("Tools/Open Claude Terminal")]
+    private static Texture2D CreateCopilotIcon()
+    {
+        int size = 16;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+
+        var pixels = new Color[size * size];
+        var clear = new Color(0, 0, 0, 0);
+        var blue = new Color(0.24f, 0.54f, 0.96f, 1f);
+        var blueBright = new Color(0.40f, 0.68f, 1f, 1f);
+
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = clear;
+
+        float cx = 7.5f;
+        float cy = 7.5f;
+
+        // Draw two overlapping circles to represent Copilot's twin-lens look
+        float[] offsetsX = { -2.5f, 2.5f };
+        foreach (float offX in offsetsX)
+        {
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Mathf.Sqrt((x - (cx + offX)) * (x - (cx + offX)) + (y - cy) * (y - cy));
+                    if (dist < 5f)
+                    {
+                        float alpha = Mathf.Clamp01(1f - dist / 5f);
+                        alpha = Mathf.Pow(alpha, 0.6f);
+                        var c = Color.Lerp(blue, blueBright, alpha);
+                        c.a = Mathf.Max(pixels[y * size + x].a, alpha);
+                        pixels[y * size + x] = c;
+                    }
+                }
+            }
+        }
+
+        // Center visor line
+        for (int x = 3; x <= 12; x++)
+        {
+            for (int y = 6; y <= 9; y++)
+            {
+                float dist = Mathf.Abs(y - 7.5f);
+                if (dist < 1.5f)
+                {
+                    float alpha = 1f - dist / 1.5f;
+                    int idx = y * size + x;
+                    var c = blueBright;
+                    c.a = Mathf.Max(pixels[idx].a, alpha * 0.9f);
+                    pixels[idx] = c;
+                }
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+        return tex;
+    }
+
+    [MenuItem("Tools/Open AI Terminal")]
     public static void OpenTerminal()
     {
         string projectPath = Application.dataPath.Replace("/Assets", "");
+        string command = SelectedTool == AITool.Claude
+            ? "claude --dangerously-skip-permissions"
+            : "gh copilot";
 
 #if UNITY_EDITOR_WIN
         var process = new System.Diagnostics.Process();
         process.StartInfo.FileName = "cmd.exe";
-        process.StartInfo.Arguments = $"/k cd /d \"{projectPath}\" && claude --dangerously-skip-permissions";
+        process.StartInfo.Arguments = $"/k cd /d \"{projectPath}\" && {command}";
         process.StartInfo.UseShellExecute = true;
         process.Start();
 #elif UNITY_EDITOR_OSX
         var process = new System.Diagnostics.Process();
         process.StartInfo.FileName = "/bin/bash";
-        process.StartInfo.Arguments = $"-c 'cd \"{projectPath}\" && claude --dangerously-skip-permissions'";
+        process.StartInfo.Arguments = $"-c 'cd \"{projectPath}\" && {command}'";
         process.StartInfo.UseShellExecute = true;
         process.Start();
 #elif UNITY_EDITOR_LINUX
         var process = new System.Diagnostics.Process();
         process.StartInfo.FileName = "/bin/bash";
-        process.StartInfo.Arguments = $"-c 'cd \"{projectPath}\" && claude --dangerously-skip-permissions'";
+        process.StartInfo.Arguments = $"-c 'cd \"{projectPath}\" && {command}'";
         process.StartInfo.UseShellExecute = true;
         process.Start();
 #endif
+    }
+}
+
+public class AIToolSettingsProvider : SettingsProvider
+{
+    public AIToolSettingsProvider() : base("Preferences/AI Tool", SettingsScope.User) { }
+
+    public override void OnGUI(string searchContext)
+    {
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("AI Tool Configuration", EditorStyles.boldLabel);
+        EditorGUILayout.Space(5);
+
+        var current = OpenClaudeTerminal.SelectedTool;
+        var selected = (AITool)EditorGUILayout.EnumPopup("Active AI Tool", current);
+
+        if (selected != current)
+        {
+            OpenClaudeTerminal.SelectedTool = selected;
+        }
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.HelpBox(
+            selected == AITool.Claude
+                ? "Claude Code will open in a terminal with --dangerously-skip-permissions flag."
+                : "GitHub Copilot CLI (gh copilot) will open in a terminal.",
+            MessageType.Info);
+    }
+
+    [SettingsProvider]
+    public static SettingsProvider CreateProvider()
+    {
+        return new AIToolSettingsProvider
+        {
+            keywords = new[] { "AI", "Claude", "Copilot", "Tool", "Terminal" }
+        };
     }
 }
