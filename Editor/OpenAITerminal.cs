@@ -11,7 +11,7 @@ public enum AITool
 }
 
 [InitializeOnLoad]
-public static class OpenClaudeTerminal
+public static class OpenAITerminal
 {
     private const string PrefKey = "AIToolSelection";
 
@@ -31,7 +31,7 @@ public static class OpenClaudeTerminal
         }
     }
 
-    static OpenClaudeTerminal()
+    static OpenAITerminal()
     {
         EditorApplication.update += TryInitialize;
     }
@@ -277,12 +277,12 @@ public class AIToolSettingsProvider : SettingsProvider
         EditorGUILayout.LabelField("AI Tool Configuration", EditorStyles.boldLabel);
         EditorGUILayout.Space(5);
 
-        var current = OpenClaudeTerminal.SelectedTool;
+        var current = OpenAITerminal.SelectedTool;
         var selected = (AITool)EditorGUILayout.EnumPopup("Active AI Tool", current);
 
         if (selected != current)
         {
-            OpenClaudeTerminal.SelectedTool = selected;
+            OpenAITerminal.SelectedTool = selected;
         }
 
         EditorGUILayout.Space(10);
