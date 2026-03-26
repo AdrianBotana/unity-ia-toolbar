@@ -309,7 +309,7 @@ public class AIToolSettingsProvider : SettingsProvider
 
         if (selected == AITool.Claude)
         {
-            var continueSession = EditorGUILayout.Toggle("Continue Session (--continue)", OpenAITerminal.ContinueSession);
+            var continueSession = EditorGUILayout.Toggle("Continue Session", OpenAITerminal.ContinueSession);
             OpenAITerminal.ContinueSession = continueSession;
 
             string claudeMode = skipPerms ? "--dangerously-skip-permissions" : "normal";
