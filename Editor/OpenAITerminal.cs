@@ -15,6 +15,7 @@ public static class OpenAITerminal
 {
     private const string PrefKey = "AIToolSelection";
     private const string SkipPermsPrefKey = "AIToolSkipPermissions";
+    private const string ContinuePrefKey = "AIToolContinueSession";
 
     private static bool initialized;
     private static int attempts;
@@ -36,6 +37,12 @@ public static class OpenAITerminal
     {
         get => EditorPrefs.GetBool(SkipPermsPrefKey, true);
         set => EditorPrefs.SetBool(SkipPermsPrefKey, value);
+    }
+
+    public static bool ContinueSession
+    {
+        get => EditorPrefs.GetBool(ContinuePrefKey, false);
+        set => EditorPrefs.SetBool(ContinuePrefKey, value);
     }
 
     static OpenAITerminal()
@@ -250,7 +257,12 @@ public static class OpenAITerminal
         string projectPath = Application.dataPath.Replace("/Assets", "");
         string command;
         if (SelectedTool == AITool.Claude)
-            command = SkipPermissions ? "claude --dangerously-skip-permissions" : "claude";
+        {
+            string claudeArgs = "";
+            if (SkipPermissions) claudeArgs += " --dangerously-skip-permissions";
+            if (ContinueSession) claudeArgs += " --continue";
+            command = "claude" + claudeArgs;
+        }
         else
             command = SkipPermissions ? "copilot --yolo" : "copilot";
 
@@ -288,26 +300,22 @@ public class AIToolSettingsProvider : SettingsProvider
 
         var current = OpenAITerminal.SelectedTool;
         var selected = (AITool)EditorGUILayout.EnumPopup("Active AI Tool", current);
-
-        if (selected != current)
-        {
-            OpenAITerminal.SelectedTool = selected;
-        }
+        OpenAITerminal.SelectedTool = selected;
 
         EditorGUILayout.Space(10);
 
         var skipPerms = EditorGUILayout.Toggle("Skip Permissions", OpenAITerminal.SkipPermissions);
-        if (skipPerms != OpenAITerminal.SkipPermissions)
-        {
-            OpenAITerminal.SkipPermissions = skipPerms;
-        }
+        OpenAITerminal.SkipPermissions = skipPerms;
 
         if (selected == AITool.Claude)
         {
+            var continueSession = EditorGUILayout.Toggle("Continue Session (--continue)", OpenAITerminal.ContinueSession);
+            OpenAITerminal.ContinueSession = continueSession;
+
+            string claudeMode = skipPerms ? "--dangerously-skip-permissions" : "normal";
+            string continuePart = continueSession ? " with --continue (resumes last session)" : "";
             EditorGUILayout.HelpBox(
-                skipPerms
-                    ? "Claude Code will open with --dangerously-skip-permissions flag."
-                    : "Claude Code will open in normal mode (will ask for permissions).",
+                $"Claude Code will open in {claudeMode} mode{continuePart}.",
                 MessageType.Info);
         }
         else
@@ -325,7 +333,7 @@ public class AIToolSettingsProvider : SettingsProvider
     {
         return new AIToolSettingsProvider
         {
-            keywords = new[] { "AI", "Claude", "Copilot", "Tool", "Terminal" }
+            keywords = new[] { "AI", "Claude", "Copilot", "Tool", "Terminal", "Continue" }
         };
     }
 }
