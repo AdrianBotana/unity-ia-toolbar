@@ -337,10 +337,10 @@ public static class OpenAITerminal
     {
         switch (ClaudeEffort)
         {
-            case ClaudeReasoningEffort.Low: return " --reasoning-effort low";
-            case ClaudeReasoningEffort.Medium: return " --reasoning-effort medium";
-            case ClaudeReasoningEffort.High: return " --reasoning-effort high";
-            case ClaudeReasoningEffort.Max: return " --reasoning-effort max";
+            case ClaudeReasoningEffort.Low: return " --effort low";
+            case ClaudeReasoningEffort.Medium: return " --effort medium";
+            case ClaudeReasoningEffort.High: return " --effort high";
+            case ClaudeReasoningEffort.Max: return " --effort max";
             default: return "";
         }
     }
