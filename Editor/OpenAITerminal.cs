@@ -10,12 +10,42 @@ public enum AITool
     Copilot
 }
 
+public enum ClaudeModel
+{
+    Default,
+    Opus,
+    Sonnet,
+    Haiku
+}
+
+public enum ClaudeReasoningEffort
+{
+    Default,
+    Low,
+    Medium,
+    High,
+    Max
+}
+
+public enum CopilotModel
+{
+    Default,
+    GPT4o,
+    Claude35Sonnet,
+    o3Mini
+}
+
 [InitializeOnLoad]
 public static class OpenAITerminal
 {
     private const string PrefKey = "AIToolSelection";
     private const string SkipPermsPrefKey = "AIToolSkipPermissions";
     private const string ContinuePrefKey = "AIToolContinueSession";
+    private const string ClaudeModelPrefKey = "AIToolClaudeModel";
+    private const string ClaudeMaxTurnsPrefKey = "AIToolClaudeMaxTurns";
+    private const string ClaudeVerbosePrefKey = "AIToolClaudeVerbose";
+    private const string ClaudeEffortPrefKey = "AIToolClaudeEffort";
+    private const string CopilotModelPrefKey = "AIToolCopilotModel";
 
     private static bool initialized;
     private static int attempts;
@@ -43,6 +73,36 @@ public static class OpenAITerminal
     {
         get => EditorPrefs.GetBool(ContinuePrefKey, false);
         set => EditorPrefs.SetBool(ContinuePrefKey, value);
+    }
+
+    public static ClaudeModel SelectedClaudeModel
+    {
+        get => (ClaudeModel)EditorPrefs.GetInt(ClaudeModelPrefKey, (int)ClaudeModel.Default);
+        set => EditorPrefs.SetInt(ClaudeModelPrefKey, (int)value);
+    }
+
+    public static int ClaudeMaxTurns
+    {
+        get => EditorPrefs.GetInt(ClaudeMaxTurnsPrefKey, 0);
+        set => EditorPrefs.SetInt(ClaudeMaxTurnsPrefKey, value);
+    }
+
+    public static bool ClaudeVerbose
+    {
+        get => EditorPrefs.GetBool(ClaudeVerbosePrefKey, false);
+        set => EditorPrefs.SetBool(ClaudeVerbosePrefKey, value);
+    }
+
+    public static ClaudeReasoningEffort ClaudeEffort
+    {
+        get => (ClaudeReasoningEffort)EditorPrefs.GetInt(ClaudeEffortPrefKey, (int)ClaudeReasoningEffort.Default);
+        set => EditorPrefs.SetInt(ClaudeEffortPrefKey, (int)value);
+    }
+
+    public static CopilotModel SelectedCopilotModel
+    {
+        get => (CopilotModel)EditorPrefs.GetInt(CopilotModelPrefKey, (int)CopilotModel.Default);
+        set => EditorPrefs.SetInt(CopilotModelPrefKey, (int)value);
     }
 
     static OpenAITerminal()
@@ -251,20 +311,65 @@ public static class OpenAITerminal
         return tex;
     }
 
+    private static string GetClaudeModelFlag()
+    {
+        switch (SelectedClaudeModel)
+        {
+            case ClaudeModel.Opus: return " --model claude-opus-4-6";
+            case ClaudeModel.Sonnet: return " --model claude-sonnet-4-6";
+            case ClaudeModel.Haiku: return " --model claude-haiku-4-5-20251001";
+            default: return "";
+        }
+    }
+
+    private static string GetCopilotModelFlag()
+    {
+        switch (SelectedCopilotModel)
+        {
+            case CopilotModel.GPT4o: return " --model gpt-4o";
+            case CopilotModel.Claude35Sonnet: return " --model claude-3.5-sonnet";
+            case CopilotModel.o3Mini: return " --model o3-mini";
+            default: return "";
+        }
+    }
+
+    private static string GetClaudeEffortFlag()
+    {
+        switch (ClaudeEffort)
+        {
+            case ClaudeReasoningEffort.Low: return " --reasoning-effort low";
+            case ClaudeReasoningEffort.Medium: return " --reasoning-effort medium";
+            case ClaudeReasoningEffort.High: return " --reasoning-effort high";
+            case ClaudeReasoningEffort.Max: return " --reasoning-effort max";
+            default: return "";
+        }
+    }
+
+    private static string BuildClaudeCommand()
+    {
+        string cmd = "claude";
+        if (SkipPermissions) cmd += " --dangerously-skip-permissions";
+        if (ContinueSession) cmd += " --continue";
+        cmd += GetClaudeModelFlag();
+        cmd += GetClaudeEffortFlag();
+        if (ClaudeMaxTurns > 0) cmd += $" --max-turns {ClaudeMaxTurns}";
+        if (ClaudeVerbose) cmd += " --verbose";
+        return cmd;
+    }
+
+    private static string BuildCopilotCommand()
+    {
+        string cmd = "copilot";
+        if (SkipPermissions) cmd += " --yolo";
+        cmd += GetCopilotModelFlag();
+        return cmd;
+    }
+
     [MenuItem("Tools/Open AI Terminal")]
     public static void OpenTerminal()
     {
         string projectPath = Application.dataPath.Replace("/Assets", "");
-        string command;
-        if (SelectedTool == AITool.Claude)
-        {
-            string claudeArgs = "";
-            if (SkipPermissions) claudeArgs += " --dangerously-skip-permissions";
-            if (ContinueSession) claudeArgs += " --continue";
-            command = "claude" + claudeArgs;
-        }
-        else
-            command = SkipPermissions ? "copilot --yolo" : "copilot";
+        string command = SelectedTool == AITool.Claude ? BuildClaudeCommand() : BuildCopilotCommand();
 
 #if UNITY_EDITOR_WIN
         var process = new System.Diagnostics.Process();
@@ -307,23 +412,72 @@ public class AIToolSettingsProvider : SettingsProvider
         var skipPerms = EditorGUILayout.Toggle("Skip Permissions", OpenAITerminal.SkipPermissions);
         OpenAITerminal.SkipPermissions = skipPerms;
 
+        EditorGUILayout.Space(10);
+
         if (selected == AITool.Claude)
         {
+            EditorGUILayout.LabelField("Claude Settings", EditorStyles.boldLabel);
+            EditorGUILayout.Space(5);
+
             var continueSession = EditorGUILayout.Toggle("Continue Session", OpenAITerminal.ContinueSession);
             OpenAITerminal.ContinueSession = continueSession;
 
-            string claudeMode = skipPerms ? "--dangerously-skip-permissions" : "normal";
-            string continuePart = continueSession ? " with --continue (resumes last session)" : "";
+            var claudeModel = (ClaudeModel)EditorGUILayout.EnumPopup("Model", OpenAITerminal.SelectedClaudeModel);
+            if (claudeModel != OpenAITerminal.SelectedClaudeModel)
+                OpenAITerminal.SelectedClaudeModel = claudeModel;
+
+            var effort = (ClaudeReasoningEffort)EditorGUILayout.EnumPopup("Reasoning Effort", OpenAITerminal.ClaudeEffort);
+            if (effort != OpenAITerminal.ClaudeEffort)
+                OpenAITerminal.ClaudeEffort = effort;
+
+            var maxTurns = EditorGUILayout.IntField("Max Turns (0 = unlimited)", OpenAITerminal.ClaudeMaxTurns);
+            if (maxTurns < 0) maxTurns = 0;
+            if (maxTurns != OpenAITerminal.ClaudeMaxTurns)
+                OpenAITerminal.ClaudeMaxTurns = maxTurns;
+
+            var verbose = EditorGUILayout.Toggle("Verbose", OpenAITerminal.ClaudeVerbose);
+            if (verbose != OpenAITerminal.ClaudeVerbose)
+                OpenAITerminal.ClaudeVerbose = verbose;
+
+            EditorGUILayout.Space(5);
+
+            string modelLabel = OpenAITerminal.SelectedClaudeModel == ClaudeModel.Default
+                ? "default model"
+                : OpenAITerminal.SelectedClaudeModel.ToString();
+            string effortLabel = OpenAITerminal.ClaudeEffort != ClaudeReasoningEffort.Default
+                ? $", effort: {OpenAITerminal.ClaudeEffort.ToString().ToLower()}"
+                : "";
+            string turnsLabel = OpenAITerminal.ClaudeMaxTurns > 0
+                ? $", max {OpenAITerminal.ClaudeMaxTurns} turns"
+                : "";
+            string verboseLabel = OpenAITerminal.ClaudeVerbose ? ", verbose" : "";
+            string continueLabel = continueSession ? ", --continue" : "";
+
             EditorGUILayout.HelpBox(
-                $"Claude Code will open in {claudeMode} mode{continuePart}.",
+                skipPerms
+                    ? $"Claude Code ({modelLabel}{effortLabel}{turnsLabel}{verboseLabel}{continueLabel}) with --dangerously-skip-permissions."
+                    : $"Claude Code ({modelLabel}{effortLabel}{turnsLabel}{verboseLabel}{continueLabel}) in normal mode.",
                 MessageType.Info);
         }
         else
         {
+            EditorGUILayout.LabelField("Copilot Settings", EditorStyles.boldLabel);
+            EditorGUILayout.Space(5);
+
+            var copilotModel = (CopilotModel)EditorGUILayout.EnumPopup("Model", OpenAITerminal.SelectedCopilotModel);
+            if (copilotModel != OpenAITerminal.SelectedCopilotModel)
+                OpenAITerminal.SelectedCopilotModel = copilotModel;
+
+            EditorGUILayout.Space(5);
+
+            string copilotModelLabel = OpenAITerminal.SelectedCopilotModel == CopilotModel.Default
+                ? "default model"
+                : OpenAITerminal.SelectedCopilotModel.ToString();
+
             EditorGUILayout.HelpBox(
                 skipPerms
-                    ? "GitHub Copilot CLI will open with --yolo flag."
-                    : "GitHub Copilot CLI (copilot) will open in a terminal.",
+                    ? $"GitHub Copilot CLI ({copilotModelLabel}) with --yolo flag."
+                    : $"GitHub Copilot CLI ({copilotModelLabel}) in a terminal.",
                 MessageType.Info);
         }
     }
@@ -333,7 +487,7 @@ public class AIToolSettingsProvider : SettingsProvider
     {
         return new AIToolSettingsProvider
         {
-            keywords = new[] { "AI", "Claude", "Copilot", "Tool", "Terminal", "Continue" }
+            keywords = new[] { "AI", "Claude", "Copilot", "Tool", "Terminal", "Continue", "Model", "Verbose", "Turns" }
         };
     }
 }
